@@ -21,8 +21,11 @@ Supply a url to observe and let the utility do it's magic:
 The program is interactive (much like less is) in that you can use single keys to perform actions.
 
 `Arrow Keys` - Scroll up or down the text one line at a time.
+
 `Page Up/Down` - Scroll up or down the text one page at a time.
+
 `n` - Toggle line numbers on or off.
+
 `q` - Exit the program.
 
 ## Options
