@@ -18,7 +18,7 @@ if (!argv.url) return console.log('No url supplied! Use --url to supply the full
 var options = {
     url : '',
     interval : 40,
-    lineNumbers : true
+    lineNumbers : false
 }
 
 // extend default options with supplied command line arguments
