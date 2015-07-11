@@ -8,7 +8,7 @@ This tool can be very load intensive on your server. It will query your server e
 
 ## Installation
 
-npm install --save api-less
+`npm install --save api-less`
 
 ## Usage
 
