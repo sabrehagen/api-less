@@ -14,12 +14,14 @@ npm install --save api-less
 
 Supply a url to observe and let the utility do it's magic:
 
-`api-less --url http://localhost:3000/api/v1/users/jacksondelahunt`
+`$ api-less --url http://localhost:3000/api/v1/users/jacksondelahunt`
 
 ## Options
 
 `--url string` - The fully qualified URL of your endpoint to query.
+
 `--interval integer` - The number of milliseconds before requerying the URL.
+
 `--lines boolean` - Display line numbers in output.
 
 ## Motivation
