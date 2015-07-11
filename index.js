@@ -143,7 +143,7 @@ function getFrameOfBuffer(data) {
     };
 }
 
-var lastGoodResponse;
+var lastGoodResponse = 'NO RESPONSE';
 function getEndpointData(url) {
     return getUrl(url).then(function(body) {
         // format our response body
