@@ -226,7 +226,7 @@ function readInput() {
 function statusBar() {
     var timestamp = new Date(lastResponse.timestamp);
     var statusText = util.format('HTTP: %s | RTT: %sms | Timestamp: %s', lastResponse.httpStatus, lastResponse.rtt, moment(timestamp).format('hh:mm:ss a'));
-    var statusLine = new Array(terminal.width() - statusText.length).join(' ') + statusText;
+    var statusLine = new Array(Math.max(terminal.width() - statusText.length, 0)).join(' ') + statusText;
 
     return statusLine;
 }
