@@ -2,15 +2,25 @@
 
 A utility that implements similar functionality to the unix less utility for observing API endpoints during debugging.
 
+**WARNING**
+
+This tool can be very load intensive on your server. It will query your server every 40ms by default to keep the data up to date. If your maximum request time is larger than 40ms, you can change the interval by suppying `--interval ms` on the command line.
+
 ## Installation
 
 npm install --save api-less
 
-## Code Example
+## Usage
 
 Supply a url to observe and let the utility do it's magic:
 
 `api-less --url http://localhost:3000/api/v1/users/jacksondelahunt`
+
+## Options
+
+`--url string` - The fully qualified URL of your endpoint to query.
+`--interval integer` - The number of milliseconds before requerying the URL.
+`--lines boolean` - Display line numbers in output.
 
 ## Motivation
 
