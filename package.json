@@ -5,6 +5,7 @@
     "es5-shim": "^4.1.7",
     "es6-shim": "^0.32.2",
     "minimist": "^1.1.1",
+    "moment": "^2.10.3",
     "request": "^2.58.0",
     "window-size": "https://github.com/sabrehagen/window-size",
     "xxhash": "^0.2.2"

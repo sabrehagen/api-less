@@ -12,9 +12,18 @@ npm install --save api-less
 
 ## Usage
 
+Your API endpoint is best paired with [nodemon](https://github.com/remy/nodemon) so that your server will automatically restart when you save your changes.
+
 Supply a url to observe and let the utility do it's magic:
 
 `$ api-less --url http://localhost:3000/api/v1/users/jacksondelahunt`
+
+The program is interactive (much like less is) in that you can use single keys to perform actions.
+
+`Arrow Keys` - Scroll up or down the text one line at a time.
+`Page Up/Down` - Scroll up or down the text one page at a time.
+`n` - Toggle line numbers on or off.
+`q` - Exit the program.
 
 ## Options
 

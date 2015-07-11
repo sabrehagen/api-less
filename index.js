@@ -7,6 +7,7 @@ var request = Promise.promisify(require('request'));
 var chalk = require('chalk');
 var terminal = require('window-size');
 var xxhash = require('xxhash');
+var moment = require('moment');
 
 // parse command line arguments
 var argv = require('minimist')(process.argv.slice(2));
@@ -29,6 +30,13 @@ var lastBuffer;
 var lastFrameHash = '';
 var lastFrame;
 
+// save the last response for the status bar
+var lastResponse = {
+    httpStatus : undefined,
+    timestamp : undefined,
+    rtt : undefined
+}
+
 // start calling the api on repeat - this is the main funcion of the program
 repeatCall();
 
@@ -50,9 +58,10 @@ function repeatCall() {
         // maintain the calculated offset. ensures we can't go past the end of the frame buffer
         currentOffset = frame.offset;
 
-        // output the requested frame
+        // output the requested frame of the buffer
         printFrame(frame)
 
+        // wait for the desired number of ms then refresh
         return wait(options.interval).then(repeatCall);
     })
     .catch(logApplicationError);
@@ -97,7 +106,7 @@ function printFrame(frame) {
             output = frame.data;
         }
         // clear the console and print the frame
-        process.stdout.write('\033[2J\n' + output + '\n:');
+        process.stdout.write(['\033[2J', chalk.white(statusBar()), output, ':'].join('\n'));
     }
 }
 
@@ -143,12 +152,15 @@ function getEndpointData(url) {
     return getUrl(url).then(function(body) {
         // format our response body
         lastGoodResponse = JSON.stringify(JSON.parse(body), null, 4);
-        return lastGoodResponse;
+        return chalk.white(lastGoodResponse);
     }).catch(function(err) {
-        // if we've not received our own error object type
-        if (err.http_code) {
-            // display error output
-            return chalk.red(lastGoodResponse);
+        if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') {
+            // server is restarting
+            lastResponse.httpStatus = 'XXX';
+            lastResponse.timestamp = Date.now();
+            lastResponse.rtt = '0';
+            //grey out output to show waiting
+            return chalk.grey(lastGoodResponse);
         } else {
              throw err;
         }
@@ -157,12 +169,11 @@ function getEndpointData(url) {
 
 // request supplied url
 function getUrl(url) {
+    var requestStart = Date.now();
     return request(url).spread(function(response, body) {
-        if (response.statusCode !== 200) {
-            var error = new Error('Bad response code');
-            error.http_code = response.statusCode;
-            throw error;
-        }
+        lastResponse.httpStatus = response.statusCode;
+        lastResponse.timestamp = Date.now();
+        lastResponse.rtt = Date.now() - requestStart;
         return body;
     });
 }
@@ -218,6 +229,14 @@ function readInput() {
     });
 }
 
+function statusBar() {
+    var timestamp = new Date(lastResponse.timestamp);
+    var statusText = util.format('HTTP: %s | RTT: %sms | Timestamp: %s', lastResponse.httpStatus, lastResponse.rtt, moment(timestamp).format('hh:mm:ss a'));
+    var statusLine = new Array(terminal.width() - statusText.length).join(' ') + statusText;
+
+    return statusLine;
+}
+
 // function kept for finding out unicode version of input character
 function toUnicode(theString) {
   var unicodeString = '';
@@ -237,6 +256,6 @@ function terminalHeight() {
     // previous output is pushed up, so lines are lost off the top of the
     // screen. thus, wrap the call to terminal height and subtract the
     // number of lines we use for status to get the 'available' terminal height
-    var statusLines = 1;
+    var statusLines = 2;
     return terminal.height() - statusLines;
 }
