@@ -11,6 +11,9 @@ var xxhash = require('xxhash');
 // parse command line arguments
 var argv = require('minimist')(process.argv.slice(2));
 
+// early exit if they haven't supplied a url; this is the only thing we need
+if (!argv.url) return console.log('No url supplied! Use --url to supply the fully qualified url you want to monitor.');
+
 // default options
 var options = {
     url : '',
@@ -26,15 +29,18 @@ var lastBuffer;
 var lastFrameHash = '';
 var lastFrame;
 
-// start calling the api on repeat
+// start calling the api on repeat - this is the main funcion of the program
 repeatCall();
 
 // monitor the command line for input
 readInput();
 
+/* --------------------------------------------------- */
+/* All helper functions below this point               */
+/* --------------------------------------------------- */
+
 function repeatCall() {
-    return getEndpointData(options.url)
-    .then(function(data) {
+    return getEndpointData(options.url).then(function(data) {
         // save a copy of the server response
         lastBuffer = data;
 
@@ -44,9 +50,10 @@ function repeatCall() {
         // maintain the calculated offset. ensures we can't go past the end of the frame buffer
         currentOffset = frame.offset;
 
+        // output the requested frame
         printFrame(frame)
-        return wait(options.interval)
-        .then(repeatCall);
+
+        return wait(options.interval).then(repeatCall);
     })
     .catch(logApplicationError);
 }
