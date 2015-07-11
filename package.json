@@ -1,12 +1,12 @@
 {
   "dependencies": {
-    "babel": "^5.6.14",
     "bluebird": "^2.9.33",
     "chalk": "^1.1.0",
     "es5-shim": "^4.1.7",
     "es6-shim": "^0.32.2",
     "minimist": "^1.1.1",
     "request": "^2.58.0",
-    "window-size": "https://github.com/sabrehagen/window-size"
+    "window-size": "https://github.com/sabrehagen/window-size",
+    "xxhash": "^0.2.2"
   }
 }

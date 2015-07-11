@@ -1,27 +1,54 @@
-//require('babel/register');
-//require('es5-shim');
-//require('es6-shim');
+require('es5-shim');
+require('es6-shim');
 
+var util = require('util');
 var Promise = require('bluebird');
 var request = Promise.promisify(require('request'));
 var chalk = require('chalk');
 var terminal = require('window-size');
+var xxhash = require('xxhash');
 
 // parse command line arguments
 var argv = require('minimist')(process.argv.slice(2));
-var url = argv.url;
-var currentOffset = 0;
 
+// default options
+var options = {
+    url : '',
+    interval : 40,
+    lineNumbers : true
+}
+
+// extend default options with supplied command line arguments
+util._extend(options, argv);
+
+var currentOffset = 0;
+var lastBuffer;
+var lastFrameHash = '';
+var lastFrame;
+
+// start calling the api on repeat
 repeatCall();
 
+// monitor the command line for input
+readInput();
+
 function repeatCall() {
-    return getEndpointData(url)
-    .then(printEndpointData)
-    .then(function() {
-        return wait(60)
+    return getEndpointData(options.url)
+    .then(function(data) {
+        // save a copy of the server response
+        lastBuffer = data;
+
+        // get a frame of the buffer at a given offset
+        var frame = getFrameOfBuffer({ requestedOffset : currentOffset, buffer : data });
+
+        // maintain the calculated offset. ensures we can't go past the end of the frame buffer
+        currentOffset = frame.offset;
+
+        printFrame(frame)
+        return wait(options.interval)
         .then(repeatCall);
     })
-//    .catch(logApplicationError);
+    .catch(logApplicationError);
 }
 
 function logApplicationError(err) {    
@@ -30,37 +57,78 @@ function logApplicationError(err) {
     console.log(err);
 }
 
-function printEndpointData(data) {
-    // print a clean screen of data
-//    console.log('\033[2J');
-    var frame = {
-        requestedOffset : currentOffset,
-        buffer : data
+function printFrame(frame) {
+    // hash the frame.
+    var frameHash = xxhash.hash(new Buffer(frame.data, 'utf-8'), 0xCAFEBABE);
+
+    // only if the frame has changed, console log it. lowers refresh rate.
+    if (frameHash !== lastFrameHash) {
+        lastFrameHash = frameHash;
+
+        // save the frame so as not to have to re-query
+        lastFrame = frame;
+
+        // make a copy of the frame data for mutation
+        var output;
+
+        if (options.lineNumbers) {
+            var lineNumber;
+            // calculate the number of characters in the largest line number
+            var padding = (frame.length + frame.offset).toString().length;
+            // prefix line numbers
+            output = frame.data.split('\n');
+            for (var i = 0; i < frame.length; i++) {
+                // format the line number and pad it to the maximum possible line number length for the frame
+                lineNumber = (frame.offset + i);
+                lineNumber = lineNumber.toString().length < padding ? lineNumber + new Array(padding - lineNumber.toString().length).join(' ') : lineNumber;
+
+                // prepend the line number to the output
+                output[i] = lineNumber + ' ' + output[i];
+            }
+            output = output.join('\n');
+        } else {
+            output = frame.data;
+        }
+        // clear the console and print the frame
+        process.stdout.write('\033[2J\n' + output + '\n:');
     }
-    getFrameOfBuffer(frame).then(function(frame) {
-        // maintain the calculated offset for the requested offset
-        currentOffset = frame.offset;
-        console.log(data);
-        console.log(Date.now());
-        console.log(data.split('\n').length);
-        console.log(data.split('\n').slice(4, 9));
-    });
 }
 
-// takes in { integer : requestedIndex, string : buffer }
-// returns { integer : offset, integer : length }
+// takes in { integer : requestedOffset, string : buffer }
+// returns { integer : offset, integer : length, string : data }
 function getFrameOfBuffer(data) {
     var lines = data.buffer.split('\n');
-    // our frame must always fit the terminal size
-    var minLength = terminal.height;
-    var maxLength = terminal.height;
-    if (minLength > data.buffer.length) minLength = data.buffer.length;
-    var offset = Math.max(0, lines.length - minLength);
-    var frame = lines.slice(lines.length, minLength);
-    return Promise.resolve({
-        offset : offset,
-        length : 
-    });
+    var frameStart, frameEnd, frame;
+
+    // if the buffer size is less than the terminal size, return the full buffer
+    if (lines.length < terminalHeight()) {
+        frameStart = 0;
+        frameEnd = lines.length;
+        frame = data.buffer;
+    } else 
+
+    // if the requested offset would result in a buffer less than the terminal size,
+    // that is, the frame would pass the end of the buffer, return a terminal sized slice
+    // of the buffer positioned at the end of the buffer
+    if (data.requestedOffset + terminalHeight() > lines.length) {
+        frameStart = lines.length - terminalHeight();
+        frameEnd = terminalHeight();
+        frame = lines.slice(frameStart, frameStart + frameEnd).join('\n');
+    } else
+
+    // we have a range within the bounds of the buffer and can return the requested size
+    {
+        // we have a frame that falls within the buffer, so pull out the frame
+        frameStart = data.requestedOffset;
+        frameEnd = terminalHeight();
+        frame = lines.slice(frameStart, frameStart + frameEnd).join('\n');
+    }
+
+    return {
+        offset : frameStart,
+        length : frameEnd,
+        data : frame
+    };
 }
 
 var lastGoodResponse;
@@ -93,10 +161,75 @@ function getUrl(url) {
 }
 
 // make a promise based 'setTimeout'
-function wait (ms) {
+function wait(ms) {
     var deferred = Promise.pending();
     setTimeout(function(){
         deferred.fulfill();
     }, ms);
     return deferred.promise;
+}
+
+function readInput() {
+    var stdin = process.stdin;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+
+    stdin.on('data', function(key) {
+//        console.log('key:', toUnicode(key), '\n');
+
+        // up
+        if (key === '\u001B\u005B\u0041') {
+            if (currentOffset > 0) currentOffset--;
+        }
+
+        // down
+        if (key === '\u001B\u005B\u0042') {
+            currentOffset++;
+        }
+
+        // page up
+        if (key === '\u001B\u005B\u0035\u007E') {
+            // keep our offset >= 0
+            currentOffset = Math.max(currentOffset - terminalHeight(), 0);
+        }
+
+        // page down
+        if (key === '\u001B\u005B\u0036\u007E') {
+            currentOffset += terminalHeight();
+        }
+
+        // n
+        if (key === '\u006E') {
+            options.lineNumbers = !options.lineNumbers;
+            // hacky: cause a refresh
+            lastFrameHash = '';
+        }
+
+        // ctrl-c or q
+        if (key === '\u0003' || key === '\u0071') process.exit();
+    });
+}
+
+// function kept for finding out unicode version of input character
+function toUnicode(theString) {
+  var unicodeString = '';
+  for (var i=0; i < theString.length; i++) {
+    var theUnicode = theString.charCodeAt(i).toString(16).toUpperCase();
+    while (theUnicode.length < 4) {
+      theUnicode = '0' + theUnicode;
+    }
+    theUnicode = '\\u' + theUnicode;
+    unicodeString += theUnicode;
+  }
+  return unicodeString;
+}
+
+function terminalHeight() {
+    // when we print status/output lines at the end of the output, the 
+    // previous output is pushed up, so lines are lost off the top of the
+    // screen. thus, wrap the call to terminal height and subtract the
+    // number of lines we use for status to get the 'available' terminal height
+    var statusLines = 1;
+    return terminal.height() - statusLines;
 }
