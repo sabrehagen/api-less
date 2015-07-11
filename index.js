@@ -6,7 +6,6 @@ var Promise = require('bluebird');
 var request = Promise.promisify(require('request'));
 var chalk = require('chalk');
 var terminal = require('window-size');
-var xxhash = require('xxhash');
 var moment = require('moment');
 
 // parse command line arguments
@@ -27,8 +26,7 @@ util._extend(options, argv);
 
 var currentOffset = 0;
 var lastBuffer;
-var lastFrameHash = '';
-var lastFrame;
+var lastFrame = {};
 
 // save the last response for the status bar
 var lastResponse = {
@@ -74,40 +72,38 @@ function logApplicationError(err) {
 }
 
 function printFrame(frame) {
-    // hash the frame.
-    var frameHash = xxhash.hash(new Buffer(frame.data, 'utf-8'), 0xCAFEBABE);
+    // the string we will print
+    var output;
 
-    // only if the frame has changed, console log it. lowers refresh rate.
-    if (frameHash !== lastFrameHash) {
-        lastFrameHash = frameHash;
+    if (options.lineNumbers) {
+        var lineNumber;
+        // calculate the number of characters in the largest line number
+        var padding = (frame.length + frame.offset).toString().length;
 
-        // save the frame so as not to have to re-query
-        lastFrame = frame;
+        // prefix line numbers
+        output = frame.data.split('\n');
+        for (var i = 0; i < frame.length; i++) {
+            // format the line number and pad it to the maximum possible line number length for the frame
+            lineNumber = (frame.offset + i);
+            lineNumber = lineNumber.toString().length < padding ? lineNumber + new Array(padding - lineNumber.toString().length).join(' ') : lineNumber;
 
-        // make a copy of the frame data for mutation
-        var output;
-
-        if (options.lineNumbers) {
-            var lineNumber;
-            // calculate the number of characters in the largest line number
-            var padding = (frame.length + frame.offset).toString().length;
-            // prefix line numbers
-            output = frame.data.split('\n');
-            for (var i = 0; i < frame.length; i++) {
-                // format the line number and pad it to the maximum possible line number length for the frame
-                lineNumber = (frame.offset + i);
-                lineNumber = lineNumber.toString().length < padding ? lineNumber + new Array(padding - lineNumber.toString().length).join(' ') : lineNumber;
-
-                // prepend the line number to the output
-                output[i] = lineNumber + ' ' + output[i];
-            }
-            output = output.join('\n');
-        } else {
-            output = frame.data;
+            // prepend the line number to the output
+            output[i] = lineNumber + ' ' + output[i];
         }
-        // clear the console and print the frame
-        process.stdout.write(['\033[2J', chalk.white(statusBar()), output, ':'].join('\n'));
+        output = output.join('\n');
+    } else {
+        output = frame.data;
     }
+
+    var statusLine;
+    if (lastResponse.httpStatus === 'XXX') {
+        statusLine = chalk.red(statusBar());
+    } else {
+        statusLine = chalk.white(statusBar());
+    }
+
+    // clear the console and print the frame
+    process.stdout.write(['\033[2J', statusLine, output, ':'].join('\n'));
 }
 
 // takes in { integer : requestedOffset, string : buffer }
@@ -220,8 +216,6 @@ function readInput() {
         // n
         if (key === '\u006E') {
             options.lineNumbers = !options.lineNumbers;
-            // hacky: cause a refresh
-            lastFrameHash = '';
         }
 
         // ctrl-c or q
