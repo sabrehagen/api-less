@@ -26,7 +26,6 @@ util._extend(options, argv);
 
 var currentOffset = 0;
 var lastBuffer;
-var lastFrame = {};
 
 // save the last response for the status bar
 var lastResponse = {
