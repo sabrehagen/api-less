@@ -1,5 +1,4 @@
 require('es5-shim');
-require('es6-shim');
 var util = require('util');
 
 // parse command line arguments
